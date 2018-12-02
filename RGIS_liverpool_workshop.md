@@ -85,7 +85,18 @@ legend("topleft", legend = proj_city_points_osgb$name, col = c("magenta", "blue"
 plot(country_sf_gbr_osgb$geometry, graticule = , axes = TRUE, col = "goldenrod1")
 
 
-blablabla
+#### blablabla
+
+### get WDPA
+wdpa <- sf::st_read("/Users/retoschmucki/Downloads/WDPA_Nov2018-shapefile/WDPA_Nov2018-shapefile-polygons.shp")
+
+wdpa_gbr <- wdpa[wdpa$ISO3 == "GBR", ]
+
+sf::st_write(wdpa_gbr, "wdpa_gbr.shp", delete_dsn = TRUE)
+
+wdpa_gbr <- sf::st_read("wdpa_gbr.shp")
+
+plot(wdpa_gbr$geometry[1:100])
 
 ##### Hillshade and Terrain map
 
@@ -94,5 +105,5 @@ slope <- raster::terrain(alt, opt = "slope")
 aspect <- raster::terrain(alt, opt = "aspect")
 hill <- raster::hillShade(slope, aspect, angle = 40, direction = 270)
 
-raster::plot(hill, col = grey(0:100/100), legend = FALSE)
-raster::plot(alt, col = rainbow(25, alpha = 0.53), add = TRUE)
+raster::plot(hill, col = grey(0:100/100), legend = FALSE, add = TRUE)
+raster::plot(alt, col = terrain.colors(25, alpha = 0.53), add = TRUE)
