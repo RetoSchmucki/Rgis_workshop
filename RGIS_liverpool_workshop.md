@@ -31,7 +31,6 @@ A spatial object is an entity with coordinates in a geographical space (x, y) or
 
 point_liverpool <- data.frame(name = 'Liverpool', longitude = -2.98, latitude = 53.41)
 point_edinburgh <- data.frame(name = 'Edinburgh', longitude = -3.19, latitude = 55.95)
-
 city_points <- rbind(point_liverpool, point_edinburgh)
 
 plot(city_points[,c("longitude", "latitude")], pch = 19, col = 'magenta')
@@ -40,9 +39,6 @@ text(city_points[,c("longitude", "latitude")], labels = city_points$name, pos = 
 
 With these two cities, although the coordinates are right, you have no information about the context of their coordinates.
 
-```r
-proj_city_points <- sf::st_as_sf(city_points, coords = c("longitude", "latitude"), crs = 4326)
-```
 
 > **Spatial projection**
 >
@@ -73,7 +69,7 @@ legend("topleft", legend = proj_city_points$name, col = c("magenta", "blue"), pc
 # reproject in OSGB 1936 / British National Grid
 
 proj_city_points_osgb <- sf::st_transform(proj_city_points, crs = 27700)
-country_sf_gbr_osgb <- sf::st_transform(country_sf.gbr, crs = 27700)
+country_sf_gbr_osgb <- sf::st_transform(country_sf_gbr, crs = 27700)
 
 # visualize the points on a map
 dev.new()
@@ -133,7 +129,7 @@ str(eunis_city)
 as.numeric(table(eunis_city[[1]]))
 
 proportion <- as.numeric(table(eunis_city[[1]]))[which(names(table(eunis_city[[1]]))!="10")] / sum(as.numeric(table(eunis_city[[1]]))) * 100
-
+proportion
 
 #### Vector object
 
@@ -176,9 +172,76 @@ plot(wdpa_gbr$geometry[wdpa_gbr$IUCN_CAT == "V"])
 wdpa_cntr <- sf::st_centroid(wdpa_gbr)
 plot(wdpa_cntr$geometry[unlist(lapply(wdpa_gbr_2, length)) >= 1])
 
-g.bbox <- raster::extent(as.numeric(sf::st_bbox(country.sf))[c(1,3,2,4)])
+g.bbox <- raster::extent(as.numeric(sf::st_bbox(country_sf_gbr))[c(1,3,2,4)])
 g.bbox_sf <- sf::st_set_crs(sf::st_as_sfc(as(g.bbox, 'SpatialPolygons')), 3035)
+plot(g.bbox_sf, add = TRUE)
 ```
+
+
+## get river from
+http://land.copernicus.eu/pan-european/satellite-derived-products/eu-hydro/eu-hydro-public-beta/eu-hydro-river-network/view
+
+
+<a name="PostgreSQ"></a>
+##### Interfacing R and PosgreSQL/PostGIS
+
+1. Install PostgreSQL, with the PostGIS extension
+2. Create a database
+3. Populate your database
+4. Extract from your database
+
+## Create PostgreSQL database
+
+```r
+library('RPostgreSQL')
+
+sql_createdb <- paste0("-h localhost -U ", "postgres", " -T ", "postgis_22_sample", " -E UTF8 -O postgres ", "RGIS_workshop")
+
+system2("createdb", sql_createdb, invisible = FALSE)
+
+drv <- dbDriver("PostgreSQL")
+
+dbcon <- dbConnect(drv, dbname = "RGIS_workshop",
+                 host = "localhost", port = 5432,
+                 user = "postgres", password = "postgres")
+
+sql_createschema <- paste0("CREATE SCHEMA IF NOT EXISTS my_shemas AUTHORIZATION postgres;")
+dbSendStatement(dbcon, sql_createschema)
+```
+
+
+```r
+library(sf)
+
+dbcon <- dbConnect(drv, dbname = "RGIS_workshop",
+                 host = "localhost", port = 5432,
+                 user = "postgres", password = "postgres")
+
+wdpa_gbr <- sf::st_read("data/wdpa_gbr.shp")
+
+sf::st_write(wdpa_gbr, dbcon, overwrite = TRUE)
+sf::st_write(wdpa_gbr[1:10,], dbcon, c("public", "wdpa_gbr"), append = TRUE)
+
+dbExistsTable(dbcon, "wdpa_gbr")
+
+psql_extract <- dbGetQuery(dbcon, "SELECT \"IUCN_CAT\", ST_AsText(geometry) as geom FROM wdpa_gbr WHERE \"IUCN_CAT\" = \'V\' AND \"MARINE\" = \'0\'")
+
+str(psql_extract)
+
+new <- sf::st_as_sf(psql_extract, wkt = "geom")
+new <- sf::st_set_crs(new, 4326)
+plot(new)
+class(new)
+
+new_area <- sf::st_area(sf::st_transform(new, 27700))
+head(new_area)
+```
+
+Interacting with PostgreSQL through your terminal
+
+### In your terminal
+ogr2ogr -f "PostgreSQL" -t_srs EPSG:27700 PG:"host=localhost port=5432 dbname=RGIS_workshop user=postgres password=postgres" 'C:\\Users\\retoschm\\OneDrive - Natural Environment Research Council\\Rgis_workshop\\data\\GADM_2.8_GBR_adm2.shp' -nln public.wdpa_gbr2 -nlt MULTIPOLYGON -overwrite -progress -unsetFid --config PG_USE_COPY YES
+
 
 
 
@@ -190,6 +253,196 @@ slope <- raster::terrain(alt, opt = "slope")
 aspect <- raster::terrain(alt, opt = "aspect")
 hill <- raster::hillShade(slope, aspect, angle = 40, direction = 270)
 
-raster::plot(hill, col = grey(0:100/100), legend = FALSE, add = TRUE)
-raster::plot(alt, col = terrain.colors(25, alpha = 0.53), add = TRUE)
+raster::plot(hill, col = grey(0:100/100), legend = FALSE)
+plot(sf::st_transform(new, 4326), add = TRUE)
+raster::plot(alt, col = terrain.colors(25, alpha = 0.5), add = TRUE)
+
 ```
+
+
+```r
+
+country_sf_gbr <- sf::st_as_sf(raster::getData(name = "GADM", country = 'GBR', level = 1))
+country_sf_gbr_osgb <- sf::st_transform(country_sf_gbr, crs = 27700)
+
+library(ggplot2)
+library(ggspatial)
+library(rasterVis)
+
+ggplot(data = country_sf_gbr_osgb) +
+    geom_sf() +
+    xlab("Longitude") + ylab("Latitude") +
+    ggtitle("GBR map", subtitle = paste0("(", length(unique(country_sf_gbr_osgb$NAME_1)), " countries)"))
+
+
+ggplot(data = country_sf_gbr_osgb) +
+    geom_sf(color = "black", fill = "goldenrod1" ) +
+    xlab("Longitude") + ylab("Latitude") +
+    ggtitle("GBR map", subtitle = paste0("(", length(unique(country_sf_gbr_osgb$NAME_1)), " countries)"))
+
+ggplot(data = country_sf_gbr_osgb) +
+    geom_sf(aes(fill = as.numeric(sf::st_area(country_sf_gbr_osgb)))) +
+    scale_fill_viridis_c(option = "plasma", name = "Area") +
+    xlab("Longitude") + ylab("Latitude") +
+    ggtitle("GBR map", subtitle = paste0("(", length(unique(country_sf_gbr_osgb$NAME_1)), " countries)"))
+
+ggplot(data = country_sf_gbr_osgb) +
+    geom_sf(aes(fill = as.numeric(sf::st_area(country_sf_gbr_osgb)))) +
+    scale_fill_viridis_c(option = "plasma", name = "Area") +
+    theme(legend.position = "bottom") +
+    xlab("Longitude") + ylab("Latitude") +
+    ggtitle("GBR map", subtitle = paste0("(", length(unique(country_sf_gbr_osgb$NAME_1)), " countries)"))
+
+#north arrow
+#scale bar
+ggplot(data = country_sf_gbr_osgb) +
+    geom_sf() +
+    xlab("Longitude") + ylab("Latitude") +
+    annotation_scale(location = "bl", width_hint = 0.5) +
+    annotation_north_arrow(location = "bl", which_north = "true",
+          pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
+          style = north_arrow_fancy_orienteering) +
+    ggtitle("GBR map", subtitle = paste0("(", length(unique(country_sf_gbr_osgb$NAME_1)), " countries)"))
+
+
+ggplot(data = country_sf_gbr_osgb) +
+    geom_sf() +
+    geom_sf(data = proj_city_points_osgb, size = 4, color = c("magenta", "blue")) +
+    xlab("Longitude") + ylab("Latitude") +
+    annotate(geom = "text",
+            x = sf::st_coordinates(sf::st_centroid(country_sf_gbr_osgb))[,1],
+            y = sf::st_coordinates(sf::st_centroid(country_sf_gbr_osgb))[,2],
+            label = country_sf_gbr_osgb$NAME_1,
+        fontface = "italic", color = "grey22", size = 3)  +
+    annotation_scale(location = "bl", width_hint = 0.5) +
+    annotation_north_arrow(location = "bl", which_north = "true",
+          pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
+          style = north_arrow_fancy_orienteering) +
+    ggtitle("GBR map", subtitle = paste0("(", length(unique(country_sf_gbr_osgb$NAME_1)), " countries)"))
+
+
+
+### need to reproject your raster
+hill_prj <- raster::projectRaster(hill, crs = sp::CRS("+init=epsg:27700"), res = 1000)
+alt_prj <- raster::projectRaster(alt, crs = sp::CRS("+init=epsg:27700"), res = 1000)
+
+hill_prj_df <- raster::as.data.frame(hill_prj, xy = TRUE)
+alt_prj_df <- raster::as.data.frame(alt_prj, xy = TRUE)
+
+
+ggplot() +
+    geom_tile(data = alt_prj_df, aes(x = x, y = y, fill = GBR_msk_alt)) +
+    xlab("Longitude") + ylab("Latitude") +
+    annotate(geom = "text",
+            x = sf::st_coordinates(sf::st_centroid(country_sf_gbr_osgb))[,1],
+            y = sf::st_coordinates(sf::st_centroid(country_sf_gbr_osgb))[,2],
+            label = country_sf_gbr_osgb$NAME_1,
+        fontface = "italic", color = "white", size = 3) +
+    annotation_scale(location = "bl", width_hint = 0.5) +
+    annotation_north_arrow(location = "bl", which_north = "true",
+          pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
+          style = north_arrow_fancy_orienteering) +
+    ggtitle("GBR map", subtitle = paste0("(", length(unique(country_sf_gbr_osgb$NAME_1)), " countries)")) +
+    theme(panel.background = element_rect(fill = "aliceblue"))
+
+## better alternative
+alt_prj_spdf <- as(alt_prj, "SpatialPixelsDataFrame")
+alt_prj_df2 <- as.data.frame(alt_prj_spdf)
+colnames(alt_prj_df2) <- c("alt", "x", "y")
+
+ggplot() +
+    # annotation_map_tile(type = "osm") +
+    geom_sf(data = country_sf_gbr_osgb) +
+    geom_tile(data = alt_prj_df2, aes(x = x, y = y, fill = alt)) +
+    geom_sf(data = proj_city_points_osgb, size = 4, color = c("magenta", "blue")) +
+    xlab("Longitude") + ylab("Latitude") +
+    annotate(geom = "text",
+            x = sf::st_coordinates(sf::st_centroid(country_sf_gbr_osgb))[,1],
+            y = sf::st_coordinates(sf::st_centroid(country_sf_gbr_osgb))[,2],
+            label = country_sf_gbr_osgb$NAME_1,
+        fontface = "italic", color = "white", size = 3) +
+    annotation_scale(location = "bl", width_hint = 0.5) +
+    annotation_north_arrow(location = "bl",which_north = "true",
+          pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
+          style = north_arrow_fancy_orienteering) +
+    ggtitle("GBR map", subtitle = paste0("(", length(unique(country_sf_gbr_osgb$NAME_1)), " countries)")) +
+    theme(panel.background = element_rect(fill = "aliceblue"))
+
+ggplot(data = country_sf_gbr_osgb) +
+    geom_sf() +
+    xlab("Longitude") + ylab("Latitude") +
+    annotate(geom = "text",
+            x = sf::st_coordinates(sf::st_centroid(country_sf_gbr_osgb))[,1],
+            y = sf::st_coordinates(sf::st_centroid(country_sf_gbr_osgb))[,2],
+            label = country_sf_gbr_osgb$NAME_1,
+            fontface = "italic", color = "grey22", size = 3)  +
+    annotation_scale(location = "bl", width_hint = 0.5) +
+    annotation_north_arrow(location = "bl", which_north = "true",
+          pad_x = unit(0.75, "in"), pad_y = unit(0.5, "in"),
+          style = north_arrow_fancy_orienteering) +
+    ggtitle("GBR map", subtitle = paste0("(", length(unique(country_sf_gbr$NAME_1)), " countries)")) +
+    theme(panel.background = element_rect(fill = "aliceblue"))
+
+
+
+library(ggplot2)
+gplot_alt <- gplot_data(alt)
+```
+
+```r
+if(!requireNamespace("rgbif")) install.packages("rgbif")
+library(rgbif)
+
+deer_locations <- occ_search(scientificName = "Cervus elaphus", limit = 5000,
+                             hasCoordinate = TRUE, country = "GB",
+                             return = "data") %>%
+                             # Simplify occurrence data frame
+                             dplyr::select(key, name, decimalLongitude,
+		                         decimalLatitude, year, individualCount, datasetKey, country)
+
+head(deer_locations)
+deer_locations_sf <- sf::st_as_sf(deer_locations, coords = c("decimalLongitude", "decimalLatitude"), crs = 4326)
+
+plot(deer_locations_sf[, "datasetKey"])
+
+
+``
+
+### ggmap
+
+R --vanilla
+library(ggmap)
+qmap(location = "boston university")
+
+library(OpenStreetMap)
+map = openmap(upperLeft = c(60,-11),
+              lowerRight = c(49.5,3))
+
+class(map)
+map2 <- openproj(map)
+autoplot(map2) +
+  xlab("Longitude") + ylab("Latitude")
+
+if(!requireNamespace("rosm")) install.packages("rosm")
+library(rosm)
+#
+
+annotation_map_tile(zoomin = -1)
+
+
+
+R --vanilla
+if(!requireNamespace("sf")) install.packages("sf")
+library(ggplot2)
+library(ggspatial)
+library(sf)
+
+ggplot(data = country_sf_gbr) +
+    geom_osm() +
+    geom_sf()
+
+
+library(prettymapr)
+    # use as a backdrop for geographical data
+    cities <- geocode(c("Halifax, NS", "Moncton, NB", "Montreal QC"))
+    ggplot(cities, aes(lon, lat, shape = query)) + annotation_map_tile(type = "osm")
