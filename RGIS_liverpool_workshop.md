@@ -301,7 +301,7 @@ sf::st_write(st_prov, dsn = "st_prov.shp", delete_layer = TRUE)
 
 # write with OGR (rgdal)
 st_prov_sp <- sf::as(st_prov, "Spatial")
-rgdal::writeOGR(st_prov_sp, "data", "st_prov_sp", driver = "ESRI Shapefile")
+rgdal::writeOGR(st_prov_sp, "st_prov_sp", driver = "ESRI Shapefile")
 ```
 
 ### Subseting and filtering
