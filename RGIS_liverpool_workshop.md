@@ -519,13 +519,29 @@ ggplot() +
 #### Can you plot the deer occurrence extracted from GBIF on a UK map?
 ```r
 library(rgbif)
+library(dplyr)
+
 deer_locations <- occ_search(scientificName = "Cervus elaphus", limit = 5000,
                              hasCoordinate = TRUE, country = "GB",
-                             return = "data") %>% dplyr::select(key, name, decimalLongitude,
-		                         decimalLatitude, year, individualCount, datasetKey, country)
+                             return = "data")
 
-deer_locations_sf <- sf::st_as_sf(deer_locations, coords = c("decimalLongitude", "decimalLatitude"), crs = 4326)
-plot(deer_locations_sf[, "datasetKey"])
+deer_locations <- deer_locations[, c("key", "name", "decimalLongitude",
+                             "decimalLatitude", "year", "individualCount",
+                             "datasetKey", "country")]
+
+deer_locations_sf <- sf::st_as_sf(as.data.frame(deer_locations), coords = c("decimalLongitude", "decimalLatitude"), crs = 4326)
+
+a <- sf::st_intersects(country_sf_gbr, deer_locations_sf)
+
+plot(sf::st_geometry(deer_locations_sf))
+plot(sf::st_geometry(deer_locations_sf)[a[[1]]], pch = 19, col = 'orange', add = TRUE)
+plot(sf::st_geometry(deer_locations_sf)[a[[2]]], pch = 19, col = 'magenta', add = TRUE)
+plot(sf::st_geometry(deer_locations_sf)[a[[3]]], pch = 19, col = 'blue', add = TRUE)
+plot(sf::st_geometry(deer_locations_sf)[a[[4]]], pch = 19, col = 'tomato3', add = TRUE)
+
+
+
+
 # ============
 # YOUR TURN!
 # ===========
