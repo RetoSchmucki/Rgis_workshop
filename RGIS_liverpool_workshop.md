@@ -144,7 +144,7 @@ plot(blp, col = "magenta", pch = 19, cex = 1, add = TRUE)
 plot(l1, col = "tomato3", lwd = 1.5, add = TRUE)
 ```
 
-### polygon
+### Polygon
 ```r
 bl1 <- sf::st_buffer(l1, 2)
 blp <- sf::st_cast(x = sf::st_sfc(bl1), to = "MULTIPOINT")
@@ -352,7 +352,7 @@ system2("createdb", sql_createdb, invisible = FALSE)
 drv <- dbDriver("PostgreSQL")
 dbcon <- dbConnect(drv, dbname = "RGIS_workshop",
                  host = "localhost", port = 5432,
-                 user = "postgres", password = "postgres")
+                 user = "postgres", password = "****")
 
 # create a schema, send your first SQL statement (query)
 sql_createschema <- paste0("CREATE SCHEMA IF NOT EXISTS my_shemas AUTHORIZATION postgres;")
@@ -366,7 +366,7 @@ dbSendStatement(dbcon, sql_createschema)
 library(sf)
 dbcon <- dbConnect(drv, dbname = "RGIS_workshop",
                  host = "localhost", port = 5432,
-                 user = "postgres", password = "postgres")
+                 user = "postgres", password = "*****")
 
 wdpa_gbr <- sf::st_read("data/wdpa_gbr.shp")
 sf::st_write(wdpa_gbr, dbcon, overwrite = TRUE)
@@ -389,7 +389,7 @@ head(new_area)
 #### Interacting with PostgreSQL through your terminal
 
 > *In your terminal, type*
-> ogr2ogr -f "PostgreSQL" -t_srs EPSG:27700 PG:"host=localhost port=5432 dbname=RGIS_workshop user=postgres password=postgres" 'C:\\Users\\retoschm\\OneDrive - Natural Environment Research Council\\Rgis_workshop\\data\\GADM_2.8_GBR_adm2.shp' -nln public.wdpa_gbr2 -nlt MULTIPOLYGON -overwrite -progress -unsetFid --config PG_USE_COPY YES
+> ogr2ogr -f "PostgreSQL" -t_srs EPSG:27700 PG:"host=localhost port=5432 dbname=RGIS_workshop user=postgres password=****" 'C:\\Users\\retoschm\\OneDrive - Natural Environment Research Council\\Rgis_workshop\\data\\GADM_2.8_GBR_adm2.shp' -nln public.wdpa_gbr2 -nlt MULTIPOLYGON -overwrite -progress -unsetFid --config PG_USE_COPY YES
 
 #### Some more raster operations
 
