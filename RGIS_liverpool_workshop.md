@@ -47,7 +47,7 @@ A spatial object is an entity with coordinates in a geographical space (x, y) or
 point_liverpool <- data.frame(name = 'Liverpool', longitude = -2.98, latitude = 53.41)
 point_edinburgh <- data.frame(name = 'Edinburgh', longitude = -3.19, latitude = 55.95)
 city_points <- rbind(point_liverpool, point_edinburgh)
-
+city_points
 # Now have a look at them in a 2D space.
 plot(city_points[,c("longitude", "latitude")], pch = 19, col = 'magenta')
 text(city_points[,c("longitude", "latitude")], labels = city_points$name, pos = c(2, 4))
@@ -155,7 +155,7 @@ plot(blp, col = "magenta", pch = 19, cex = 1, add = TRUE)
 plot(l1, col = "tomato3", lwd = 1.5, add = TRUE)
 ```
 
-### Intersects and intesections
+### Intersects and intersections
 ```r
 p1 <- sf::st_as_sf(data.frame(X = c(1, 4, 3, 7), Y = c(2, 2, 5, 3) ), coords = c("X", "Y"), crs = 4326)
 poly1 <- st_as_sfc(st_bbox(st_buffer(p1[2,], 2)))
@@ -300,7 +300,7 @@ st_prov <- sf::st_read("data/GADM_2.8_GBR_adm2.shp")
 sf::st_write(st_prov, dsn = "st_prov.shp", delete_layer = TRUE)
 
 # write with OGR (rgdal)
-st_prov_sp <- sf::as(st_prov, "Spatial")
+st_prov_sp <- as(st_prov, "Spatial")
 rgdal::writeOGR(st_prov_sp, "st_prov_sp", driver = "ESRI Shapefile")
 ```
 
@@ -340,19 +340,22 @@ plot(g.bbox_sf, add = TRUE)
 3. Populate your database
 4. Extract from your database
 
+##### in terminal
+psql -h localhost -U postgres
+
 ## Create PostgreSQL database
 ```r
 library('RPostgreSQL')
 
 # create a new database in on your local PostgreSQL server
-sql_createdb <- paste0("-h localhost -U ", "postgres", " -T ", "postgis_22_sample", " -E UTF8 -O postgres ", "RGIS_workshop")
+sql_createdb <- paste0("-h localhost -U ", "postgres", " -T ", "postgis_22_sample", " -E UTF8 -O postgres ", "RGIS_workshop_new")
 system2("createdb", sql_createdb, invisible = FALSE)
 
 # connect R to your server and newly created database
 drv <- dbDriver("PostgreSQL")
-dbcon <- dbConnect(drv, dbname = "RGIS_workshop",
+dbcon <- dbConnect(drv, dbname = "RGIS_workshop_new",
                  host = "localhost", port = 5432,
-                 user = "postgres", password = "****")
+                 user = "postgres", password = "postgres")
 
 # create a schema, send your first SQL statement (query)
 sql_createschema <- paste0("CREATE SCHEMA IF NOT EXISTS my_shemas AUTHORIZATION postgres;")
@@ -375,7 +378,7 @@ sf::st_write(wdpa_gbr, dbcon, overwrite = TRUE)
 dbExistsTable(dbcon, "wdpa_gbr")
 
 # extract some data with a SQL query and a condition
-psql_extract <- dbGetQuery(dbcon, "SELECT \"IUCN_CAT\", ST_AsText(geometry) as geom FROM wdpa_gbr WHERE \"IUCN_CAT\" = \'V\' AND \"MARINE\" = \'0\'")
+psql_extract <- dbGetQuery(dbcon, "SELECT \"IUCN_CAT\", ST_Area(ST_transform(geometry,27700)) as area FROM wdpa_gbr WHERE \"IUCN_CAT\" = \'V\' AND \"MARINE\" = \'0\'")
 
 str(psql_extract)
 new_extract <- sf::st_as_sf(psql_extract, wkt = "geom")
@@ -425,7 +428,7 @@ proj_city_points_osgb <- sf::st_transform(sf::st_as_sf(city_points, coords = c("
 ggplot(data = country_sf_gbr_osgb) +
     geom_sf() +
     xlab("Longitude") + ylab("Latitude") +
-    ggtitle("GBR map", subtitle = paste0("(", length(unique(country_sf_gbr_osgb$NAME_1)), " countries)"))
+    ggtitle("GBR map", subtitle = paste0("(", length(unique(country_sf_gbr_osgb$NAME_1)), "countries)"))
 
 ## some colors
 ggplot(data = country_sf_gbr_osgb) +
